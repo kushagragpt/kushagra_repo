@@ -412,8 +412,223 @@ RESUME_FALSE_INTERRUPTION=true
 
 ## Bonus Challenges (Optional)
 
-- ✅ **Dynamic ignored-word lists during runtime**: Implemented with `enable_dynamic_updates` flag
-- ⚠️ **Multi-language filler detection**: Basic support for English + Hindi, extensible to others
+- ✅ **Dynamic ignored-word lists during runtime**: Fully implemented with comprehensive runtime API
+- ✅ **Multi-language filler detection**: Complete support for English + Hindi with language presets and mixed-language conversations
+
+---
+
+## 🎯 Bonus Features Implementation
+
+### 1. Dynamic Runtime Updates
+
+The interruption handler now supports comprehensive runtime updates without restarting the agent:
+
+#### Runtime API Methods
+
+```python
+# Add/remove individual words
+handler.add_ignored_word("okay")          # Returns True if added
+handler.remove_ignored_word("okay")       # Returns True if removed
+
+# Bulk operations
+handler.add_ignored_words_bulk(["okay", "right", "sure"])     # Returns count added
+handler.remove_ignored_words_bulk(["okay", "right"])          # Returns count removed
+
+# Add entire language presets
+handler.add_language_preset(Language.HINDI)    # Adds all Hindi fillers
+
+# Update confidence threshold
+handler.update_confidence_threshold(0.3)       # Returns True if updated
+
+# Reset to defaults
+handler.reset_to_defaults(Language.ENGLISH)    # Reset to English preset
+
+# Get current state
+words = handler.get_ignored_words()            # Get all ignored words
+stats = handler.get_stats()                    # Get statistics
+words_by_lang = handler.get_ignored_words_by_language()  # Categorized by language
+```
+
+#### Control via LiveKit Data Messages
+
+The agent supports runtime control via LiveKit data channel messages:
+
+```json
+// Add a word
+{"command": "add_word", "word": "okay"}
+
+// Remove a word
+{"command": "remove_word", "word": "okay"}
+
+// Add multiple words
+{"command": "add_words", "words": ["okay", "right", "sure"]}
+
+// Remove multiple words
+{"command": "remove_words", "words": ["okay", "right"]}
+
+// Add language preset
+{"command": "add_language", "language": "hi"}
+
+// Update confidence threshold
+{"command": "set_threshold", "threshold": 0.3}
+
+// Get statistics
+{"command": "get_stats"}
+
+// Get current words
+{"command": "get_words"}
+
+// Reset to defaults
+{"command": "reset", "language": "en"}
+```
+
+**Example Usage:**
+```bash
+# Run the demo to see runtime updates in action
+python runtime_control_demo.py
+```
+
+### 2. Multi-Language Filler Detection
+
+Complete support for English and Hindi with language-specific filler word presets.
+
+#### Language Presets
+
+**English Fillers (28 words/phrases):**
+- Single words: `uh`, `um`, `umm`, `er`, `ah`, `eh`, `hmm`, `like`, `basically`, `actually`, `literally`, `well`, `so`, `yeah`, `yep`, `yup`, `nah`, `nope`
+- Multi-word phrases: `you know`, `i mean`, `sort of`, `kind of`, `uh-huh`, `mm-hmm`, `uh-uh`, `mm-mm`
+
+**Hindi Fillers (27 words/phrases):**
+- Common: `haan`, `han`, `hmm`, `achha`, `accha`, `theek`, `thik`, `matlab`, `yaani`, `kya`, `toh`, `to`, `bas`
+- Expressions: `arre`, `arrey`, `arey`, `haa`, `naa`, `na`, `ji`, `hnji`, `acha`, `aha`, `oho`, `uff`, `arre bhai`, `yaar`
+
+**Mixed Language:**
+- Combines both English and Hindi presets (54 total words/phrases)
+- Perfect for bilingual conversations
+
+#### Configuration Options
+
+**Option 1: Use Language Presets (Recommended)**
+
+```env
+# .env file
+USE_LANGUAGE_PRESETS=true
+LANGUAGES=mixed                    # Options: en, hi, mixed, or comma-separated
+ADDITIONAL_IGNORED_WORDS=okay,right  # Optional custom words
+CONFIDENCE_THRESHOLD=0.5
+```
+
+**Option 2: Custom Word List (Legacy)**
+
+```env
+# .env file
+USE_LANGUAGE_PRESETS=false
+IGNORED_WORDS=uh,umm,hmm,haan,um,er,ah
+CONFIDENCE_THRESHOLD=0.5
+```
+
+#### Code Examples
+
+**English-only configuration:**
+```python
+config = InterruptionConfig.from_languages([Language.ENGLISH])
+handler = InterruptionHandler(config)
+
+handler.should_ignore_speech("uh")          # True - English filler
+handler.should_ignore_speech("you know")    # True - English phrase
+handler.should_ignore_speech("haan")        # False - Hindi filler (not in English preset)
+```
+
+**Hindi-only configuration:**
+```python
+config = InterruptionConfig.from_languages([Language.HINDI])
+handler = InterruptionHandler(config)
+
+handler.should_ignore_speech("haan")        # True - Hindi filler
+handler.should_ignore_speech("achha")       # True - Hindi filler
+handler.should_ignore_speech("uh")          # False - English filler (not in Hindi preset)
+```
+
+**Mixed language configuration:**
+```python
+config = InterruptionConfig.from_languages([Language.MIXED])
+handler = InterruptionHandler(config)
+
+handler.should_ignore_speech("uh")          # True - English filler
+handler.should_ignore_speech("haan")        # True - Hindi filler
+handler.should_ignore_speech("uh haan")     # True - Both are fillers
+handler.should_ignore_speech("hello namaste")  # False - Real words in both languages
+```
+
+**Custom words with language presets:**
+```python
+config = InterruptionConfig.from_languages(
+    languages=[Language.MIXED],
+    additional_words=["okay", "right", "sure"]
+)
+handler = InterruptionHandler(config)
+```
+
+#### Multi-Language Conversation Examples
+
+```python
+# Realistic mixed English-Hindi scenarios
+handler.should_ignore_speech("uh haan hmm")           # True - All fillers
+handler.should_ignore_speech("achha yeah umm")        # True - All fillers
+handler.should_ignore_speech("hello kaise ho")        # False - Real conversation
+handler.should_ignore_speech("wait ruko")             # False - Real interruption
+handler.should_ignore_speech("umm hello namaste")     # False - Has real words
+```
+
+### Testing the New Features
+
+**Run comprehensive tests:**
+```bash
+python test_scenarios.py
+```
+
+**Run interactive demo:**
+```bash
+python runtime_control_demo.py
+```
+
+**Test coverage includes:**
+- ✅ 8 basic functionality tests
+- ✅ 4 multi-language support tests
+- ✅ 4 runtime update tests
+- ✅ 2 advanced features tests
+- **Total: 18 comprehensive tests**
+
+### Statistics and Monitoring
+
+The handler now tracks detailed statistics:
+
+```python
+stats = handler.get_stats()
+# Returns:
+{
+    "ignored_words_count": 54,
+    "confidence_threshold": 0.5,
+    "dynamic_updates_enabled": True,
+    "languages": ["mixed"],
+    "use_language_presets": True,
+    "ignored_words": [...],
+    "statistics": {
+        "total_speech_events": 100,
+        "ignored_filler_count": 45,
+        "ignored_low_confidence_count": 10,
+        "valid_interruptions": 45,
+        "dynamic_updates_count": 5
+    }
+}
+```
+
+### Performance Considerations
+
+- **Multi-word phrase detection**: Efficiently handles phrases like "you know", "i mean"
+- **Language categorization**: Words are categorized by language for easy management
+- **Runtime updates**: Zero-downtime updates to ignored word lists
+- **Statistics tracking**: Minimal overhead for monitoring
 
 ## License
 
